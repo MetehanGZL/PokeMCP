@@ -400,23 +400,23 @@ server.tool(
       // Check if the matched word is actually a type and not just any adjective
       const validTypes = [
         "normal",
-        "ateş",
-        "su",
-        "çimen",
-        "elektrik",
-        "buz",
-        "dövüş",
-        "zehir",
-        "yer",
-        "uçan",
-        "psişik",
-        "böcek",
-        "kaya",
-        "hayalet",
-        "ejderha",
-        "karanlık",
-        "çelik",
-        "peri",
+        "fire",
+        "water",
+        "grass",
+        "electric",
+        "ice",
+        "fighting",
+        "poison",
+        "ground",
+        "flying",
+        "psychic",
+        "bug",
+        "rock",
+        "ghost",
+        "dragon",
+        "dark",
+        "steel",
+        "fairy",
       ];
       if (validTypes.includes(type)) {
         return await getRandomPokemonByType(type);
@@ -479,22 +479,10 @@ async function getPokemonStats(pokemonId: number): Promise<BattleStats> {
 async function createBattlePokemon(pokemonId: number, level: number = 50): Promise<BattlePokemon | null> {
   try {
     const pokemon = await fetchFromPokeAPI<Pokemon>(`/pokemon/${pokemonId}`);
-    if (!pokemon) {
-      console.error(`Pokémon bulunamadı (ID: ${pokemonId})`);
-      return null;
-    }
-
-    const stats = await getPokemonStats(pokemonId);
-    if (!stats) {
-      console.error(`Pokémon istatistikleri alınamadı (ID: ${pokemonId})`);
-      return null;
-    }
+    if (!pokemon) return null;
 
     const moves = await getPokemonMoves(pokemonId);
-    if (!moves || moves.length === 0) {
-      console.error(`Pokémon hareketleri alınamadı (ID: ${pokemonId})`);
-      return null;
-    }
+    const stats = await getPokemonStats(pokemonId);
 
     return {
       id: pokemon.id,
@@ -503,14 +491,101 @@ async function createBattlePokemon(pokemonId: number, level: number = 50): Promi
       types: pokemon.types,
       stats,
       moves,
-      currentHp: stats.hp
+      currentHp: stats.hp,
+      status: { type: 'none', turnsLeft: 0 },
+      statModifiers: {
+        attack: 0,
+        defense: 0,
+        specialAttack: 0,
+        specialDefense: 0,
+        speed: 0
+      },
+      experience: 0,
+      items: []
     };
   } catch (error) {
-    console.error(`Pokémon oluşturma hatası (ID: ${pokemonId}):`, error);
+    console.error("Error creating battle Pokémon:", error);
     return null;
   }
 }
 
+// Yeni yardımcı fonksiyonlar
+function calculateTypeEffectiveness(attackerType: string, defenderTypes: string[]): number {
+  // Type interactions (simple version)
+  const typeChart: Record<string, Record<string, number>> = {
+    'fire': { 'water': 0.5, 'grass': 2, 'ice': 2 },
+    'water': { 'fire': 2, 'grass': 0.5, 'ground': 2 },
+    'grass': { 'fire': 0.5, 'water': 2, 'bug': 0.5 },
+    // Add more types as needed
+  };
+
+  let effectiveness = 1;
+  for (const defenderType of defenderTypes) {
+    if (typeChart[attackerType]?.[defenderType]) {
+      effectiveness *= typeChart[attackerType][defenderType];
+    }
+  }
+  return effectiveness;
+}
+
+function applyWeatherEffects(battleState: BattleState): void {
+  const weather = battleState.weather;
+  if (weather.type === 'sunny') {
+    // Fire type moves are boosted
+    battleState.battleLog.push('Sunny weather boosts Fire-type moves!');
+  } else if (weather.type === 'rainy') {
+    // Water type moves are boosted
+    battleState.battleLog.push('Rainy weather boosts Water-type moves!');
+  }
+}
+
+function applyStatusEffects(battleState: BattleState): void {
+  // Status effects for player's Pokémon
+  if (battleState.playerPokemon.status.type !== 'none') {
+    const status = battleState.playerPokemon.status;
+    switch (status.type) {
+      case 'burn':
+        const burnDamage = Math.floor(battleState.playerPokemon.stats.hp * 0.1);
+        battleState.playerPokemon.currentHp = Math.max(0, battleState.playerPokemon.currentHp - burnDamage);
+        battleState.battleLog.push(`${battleState.playerPokemon.name} took burn damage!`);
+        break;
+      case 'poison':
+        const poisonDamage = Math.floor(battleState.playerPokemon.stats.hp * 0.08);
+        battleState.playerPokemon.currentHp = Math.max(0, battleState.playerPokemon.currentHp - poisonDamage);
+        battleState.battleLog.push(`${battleState.playerPokemon.name} took poison damage!`);
+        break;
+    }
+    status.turnsLeft--;
+    if (status.turnsLeft <= 0) {
+      battleState.playerPokemon.status = { type: 'none', turnsLeft: 0 };
+      battleState.battleLog.push(`${battleState.playerPokemon.name}'s status returned to normal!`);
+    }
+  }
+
+  // Similar effects for opponent's Pokémon
+  if (battleState.opponentPokemon.status.type !== 'none') {
+    const status = battleState.opponentPokemon.status;
+    switch (status.type) {
+      case 'burn':
+        const burnDamage = Math.floor(battleState.opponentPokemon.stats.hp * 0.1);
+        battleState.opponentPokemon.currentHp = Math.max(0, battleState.opponentPokemon.currentHp - burnDamage);
+        battleState.battleLog.push(`${battleState.opponentPokemon.name} took burn damage!`);
+        break;
+      case 'poison':
+        const poisonDamage = Math.floor(battleState.opponentPokemon.stats.hp * 0.08);
+        battleState.opponentPokemon.currentHp = Math.max(0, battleState.opponentPokemon.currentHp - poisonDamage);
+        battleState.battleLog.push(`${battleState.opponentPokemon.name} took poison damage!`);
+        break;
+    }
+    status.turnsLeft--;
+    if (status.turnsLeft <= 0) {
+      battleState.opponentPokemon.status = { type: 'none', turnsLeft: 0 };
+      battleState.battleLog.push(`${battleState.opponentPokemon.name}'s status returned to normal!`);
+    }
+  }
+}
+
+// Geliştirilmiş hasar hesaplama
 function calculateDamage(attacker: BattlePokemon, defender: BattlePokemon, move: BattleMove): number {
   const attack = move.type === "physical" ? attacker.stats.attack : attacker.stats.specialAttack;
   const defense = move.type === "physical" ? defender.stats.defense : defender.stats.specialDefense;
@@ -518,20 +593,39 @@ function calculateDamage(attacker: BattlePokemon, defender: BattlePokemon, move:
   const level = attacker.level;
   const power = move.power;
   
-  // Basic damage formula
-  const damage = Math.floor(((2 * level / 5 + 2) * power * attack / defense) / 50 + 2);
+  // Temel hasar formülü
+  let damage = Math.floor(((2 * level / 5 + 2) * power * attack / defense) / 50 + 2);
   
-  // Random factor (0.85 to 1.00)
+  // Tip etkileşimi
+  const typeEffectiveness = calculateTypeEffectiveness(move.type, defender.types.map(t => t.type.name));
+  damage *= typeEffectiveness;
+  
+  // Durum efektleri
+  if (attacker.status.type === 'burn' && move.type === 'physical') {
+    damage *= 0.5;
+  }
+  
+  // Rastgele faktör (0.85 to 1.00)
   const randomFactor = 0.85 + Math.random() * 0.15;
+  damage *= randomFactor;
   
-  return Math.floor(damage * randomFactor);
+  return Math.floor(damage);
 }
 
 function isMoveHit(move: BattleMove): boolean {
   return Math.random() * 100 <= move.accuracy;
 }
 
+// Geliştirilmiş savaş turu
 async function executeBattleTurn(state: BattleState, playerMoveIndex: number): Promise<BattleState> {
+  state.battleLog = []; // Clear log for new turn
+  
+  // Apply weather effects
+  applyWeatherEffects(state);
+  
+  // Apply status effects
+  applyStatusEffects(state);
+  
   const playerMove = state.playerPokemon.moves[playerMoveIndex];
   const opponentMove = state.opponentPokemon.moves[Math.floor(Math.random() * state.opponentPokemon.moves.length)];
 
@@ -539,12 +633,20 @@ async function executeBattleTurn(state: BattleState, playerMoveIndex: number): P
   if (isMoveHit(playerMove)) {
     const damage = calculateDamage(state.playerPokemon, state.opponentPokemon, playerMove);
     state.opponentPokemon.currentHp = Math.max(0, state.opponentPokemon.currentHp - damage);
+    state.battleLog.push(`${state.playerPokemon.name} used ${playerMove.name}!`);
+    state.battleLog.push(`${state.opponentPokemon.name} took ${damage} damage!`);
+  } else {
+    state.battleLog.push(`${state.playerPokemon.name}'s move missed!`);
   }
 
   // Opponent's turn (if still alive)
   if (state.opponentPokemon.currentHp > 0 && isMoveHit(opponentMove)) {
     const damage = calculateDamage(state.opponentPokemon, state.playerPokemon, opponentMove);
     state.playerPokemon.currentHp = Math.max(0, state.playerPokemon.currentHp - damage);
+    state.battleLog.push(`${state.opponentPokemon.name} used ${opponentMove.name}!`);
+    state.battleLog.push(`${state.playerPokemon.name} took ${damage} damage!`);
+  } else if (state.opponentPokemon.currentHp > 0) {
+    state.battleLog.push(`${state.opponentPokemon.name}'s move missed!`);
   }
 
   state.turn++;
@@ -552,37 +654,30 @@ async function executeBattleTurn(state: BattleState, playerMoveIndex: number): P
 }
 
 async function startBattle(playerPokemonId: number, opponentPokemonId: number): Promise<BattleState> {
-  try {
-    const playerPokemon = await createBattlePokemon(playerPokemonId);
-    if (!playerPokemon) {
-      throw new Error(`Oyuncu Pokémon'u bulunamadı (ID: ${playerPokemonId})`);
-    }
+  const playerPokemon = await createBattlePokemon(playerPokemonId);
+  const opponentPokemon = await createBattlePokemon(opponentPokemonId);
 
-    const opponentPokemon = await createBattlePokemon(opponentPokemonId);
-    if (!opponentPokemon) {
-      throw new Error(`Rakip Pokémon'u bulunamadı (ID: ${opponentPokemonId})`);
-    }
-
-    return {
-      playerPokemon,
-      opponentPokemon,
-      turn: 0,
-      weather: "normal",
-      status: "active"
-    };
-  } catch (error) {
-    console.error("Savaş başlatma hatası:", error);
-    throw error;
+  if (!playerPokemon || !opponentPokemon) {
+    throw new Error("Failed to create battle Pokémon");
   }
+
+  return {
+    playerPokemon,
+    opponentPokemon,
+    turn: 1,
+    weather: { type: 'none', turnsLeft: 0 },
+    status: 'active',
+    battleLog: []
+  };
 }
 
 // Update battle commands to use tool instead of addCommand
 server.tool(
   "start_battle",
-  "İki Pokémon arasında savaş başlat",
+  "Start a battle between two Pokémon",
   {
-    playerPokemonId: z.number().describe("Oyuncunun Pokémon'unun ID'si"),
-    opponentPokemonId: z.number().describe("Rakibin Pokémon'unun ID'si")
+    playerPokemonId: z.number().describe("Player's Pokémon ID"),
+    opponentPokemonId: z.number().describe("Opponent's Pokémon ID")
   },
   async (params) => {
     try {
@@ -593,16 +688,16 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Savaş başladı!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nKullanılabilir hareketler:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
+            text: `Battle started!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} HP: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} HP: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nAvailable moves:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
           }
         ]
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         content: [
           {
             type: "text",
-            text: `Savaş başlatılamadı: ${error.message}`
+            text: `Failed to start battle: ${error.message || 'Unknown error occurred'}`
           }
         ]
       };
@@ -612,9 +707,9 @@ server.tool(
 
 server.tool(
   "make_move",
-  "Mevcut savaşta bir hareket yap",
+  "Make a move in the current battle",
   {
-    moveIndex: z.number().min(0).max(3).describe("Kullanılacak hareketin indeksi (0-3)")
+    moveIndex: z.number().min(0).max(3).describe("Index of the move to use (0-3)")
   },
   async (params) => {
     if (!currentBattle) {
@@ -622,7 +717,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: "Aktif bir savaş yok! Önce start_battle komutu ile bir savaş başlatın."
+            text: "No active battle! Start a battle first using the start_battle command."
           }
         ]
       };
@@ -634,17 +729,17 @@ server.tool(
     const playerMove = battleState.playerPokemon.moves[params.moveIndex];
     const opponentMove = battleState.opponentPokemon.moves[Math.floor(Math.random() * battleState.opponentPokemon.moves.length)];
 
-    let battleLog = `Tur ${battleState.turn}:\n`;
-    battleLog += `${battleState.playerPokemon.name} ${playerMove.name} hareketini kullandı!\n`;
-    battleLog += `${battleState.opponentPokemon.name} ${opponentMove.name} hareketini kullandı!\n\n`;
+    let battleLog = `Turn ${battleState.turn}:\n`;
+    battleLog += `${battleState.playerPokemon.name} used ${playerMove.name}!\n`;
+    battleLog += `${battleState.opponentPokemon.name} used ${opponentMove.name}!\n\n`;
 
-    battleLog += `${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n`;
-    battleLog += `${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n`;
+    battleLog += `${battleState.playerPokemon.name} HP: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n`;
+    battleLog += `${battleState.opponentPokemon.name} HP: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n`;
 
     // Check for battle end
     if (battleState.playerPokemon.currentHp <= 0 || battleState.opponentPokemon.currentHp <= 0) {
       const winner = battleState.playerPokemon.currentHp <= 0 ? battleState.opponentPokemon.name : battleState.playerPokemon.name;
-      battleLog += `\nSavaş bitti! ${winner} kazandı!`;
+      battleLog += `\nBattle ended! ${winner} won!`;
       currentBattle = null;
     }
 
@@ -653,6 +748,60 @@ server.tool(
         {
           type: "text",
           text: battleLog
+        }
+      ]
+    };
+  }
+);
+
+// Yeni komutlar ekle
+server.tool(
+  "use_item",
+  "Use an item in battle",
+  {
+    itemIndex: z.number().min(0).describe("Index of the item to use")
+  },
+  async (params) => {
+    if (!currentBattle) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "No active battle! Start a battle first using the start_battle command."
+          }
+        ]
+      };
+    }
+
+    const item = currentBattle.playerPokemon.items[params.itemIndex];
+    if (!item) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Invalid item index!"
+          }
+        ]
+      };
+    }
+
+    // Apply item effects
+    if (item.effect.heal) {
+      currentBattle.playerPokemon.currentHp = Math.min(
+        currentBattle.playerPokemon.stats.hp,
+        currentBattle.playerPokemon.currentHp + item.effect.heal
+      );
+      currentBattle.battleLog.push(`${currentBattle.playerPokemon.name} recovered ${item.effect.heal} HP!`);
+    }
+
+    // Mark item as used
+    currentBattle.playerPokemon.items.splice(params.itemIndex, 1);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: currentBattle.battleLog.join('\n')
         }
       ]
     };

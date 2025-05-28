@@ -86,6 +86,30 @@ export interface BattleMove {
   pp: number;
 }
 
+// Gelişmiş savaş sistemi için yeni tipler
+export interface PokemonStatus {
+  type: 'none' | 'burn' | 'poison' | 'paralyze' | 'sleep';
+  turnsLeft: number;
+}
+
+export interface BattleItem {
+  name: string;
+  effect: {
+    heal?: number;
+    status?: 'none' | 'burn' | 'poison' | 'paralyze' | 'sleep';
+    statBoost?: {
+      stat: 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed';
+      amount: number;
+    };
+  };
+}
+
+export interface BattleWeather {
+  type: 'none' | 'sunny' | 'rainy' | 'sandstorm' | 'hail';
+  turnsLeft: number;
+}
+
+// Geliştirilmiş BattlePokemon interface'i
 export interface BattlePokemon {
   id: number;
   name: string;
@@ -94,14 +118,26 @@ export interface BattlePokemon {
   stats: BattleStats;
   moves: BattleMove[];
   currentHp: number;
+  status: PokemonStatus;
+  statModifiers: {
+    attack: number;
+    defense: number;
+    specialAttack: number;
+    specialDefense: number;
+    speed: number;
+  };
+  experience: number;
+  items: BattleItem[];
 }
 
+// Geliştirilmiş BattleState interface'i
 export interface BattleState {
   playerPokemon: BattlePokemon;
   opponentPokemon: BattlePokemon;
   turn: number;
-  weather: string;
+  weather: BattleWeather;
   status: string;
+  battleLog: string[];
 }
 
 export interface BattleResult {
