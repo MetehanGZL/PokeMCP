@@ -476,22 +476,39 @@ async function getPokemonStats(pokemonId: number): Promise<BattleStats> {
   };
 }
 
-async function createBattlePokemon(pokemonId: number, level: number = 50): Promise<BattlePokemon> {
-  const pokemon = await fetchFromPokeAPI<Pokemon>(`/pokemon/${pokemonId}`);
-  if (!pokemon) throw new Error("Pokemon not found");
+async function createBattlePokemon(pokemonId: number, level: number = 50): Promise<BattlePokemon | null> {
+  try {
+    const pokemon = await fetchFromPokeAPI<Pokemon>(`/pokemon/${pokemonId}`);
+    if (!pokemon) {
+      console.error(`Pokémon bulunamadı (ID: ${pokemonId})`);
+      return null;
+    }
 
-  const stats = await getPokemonStats(pokemonId);
-  const moves = await getPokemonMoves(pokemonId);
+    const stats = await getPokemonStats(pokemonId);
+    if (!stats) {
+      console.error(`Pokémon istatistikleri alınamadı (ID: ${pokemonId})`);
+      return null;
+    }
 
-  return {
-    id: pokemon.id,
-    name: pokemon.name,
-    level,
-    types: pokemon.types,
-    stats,
-    moves,
-    currentHp: stats.hp
-  };
+    const moves = await getPokemonMoves(pokemonId);
+    if (!moves || moves.length === 0) {
+      console.error(`Pokémon hareketleri alınamadı (ID: ${pokemonId})`);
+      return null;
+    }
+
+    return {
+      id: pokemon.id,
+      name: pokemon.name,
+      level,
+      types: pokemon.types,
+      stats,
+      moves,
+      currentHp: stats.hp
+    };
+  } catch (error) {
+    console.error(`Pokémon oluşturma hatası (ID: ${pokemonId}):`, error);
+    return null;
+  }
 }
 
 function calculateDamage(attacker: BattlePokemon, defender: BattlePokemon, move: BattleMove): number {
@@ -535,16 +552,28 @@ async function executeBattleTurn(state: BattleState, playerMoveIndex: number): P
 }
 
 async function startBattle(playerPokemonId: number, opponentPokemonId: number): Promise<BattleState> {
-  const playerPokemon = await createBattlePokemon(playerPokemonId);
-  const opponentPokemon = await createBattlePokemon(opponentPokemonId);
+  try {
+    const playerPokemon = await createBattlePokemon(playerPokemonId);
+    if (!playerPokemon) {
+      throw new Error(`Oyuncu Pokémon'u bulunamadı (ID: ${playerPokemonId})`);
+    }
 
-  return {
-    playerPokemon,
-    opponentPokemon,
-    turn: 0,
-    weather: "normal",
-    status: "active"
-  };
+    const opponentPokemon = await createBattlePokemon(opponentPokemonId);
+    if (!opponentPokemon) {
+      throw new Error(`Rakip Pokémon'u bulunamadı (ID: ${opponentPokemonId})`);
+    }
+
+    return {
+      playerPokemon,
+      opponentPokemon,
+      turn: 0,
+      weather: "normal",
+      status: "active"
+    };
+  } catch (error) {
+    console.error("Savaş başlatma hatası:", error);
+    throw error;
+  }
 }
 
 // Update battle commands to use tool instead of addCommand
@@ -556,17 +585,28 @@ server.tool(
     opponentPokemonId: z.number().describe("Rakibin Pokémon'unun ID'si")
   },
   async (params) => {
-    const battleState = await startBattle(params.playerPokemonId, params.opponentPokemonId);
-    currentBattle = battleState;
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Savaş başladı!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nKullanılabilir hareketler:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
-        }
-      ]
-    };
+    try {
+      const battleState = await startBattle(params.playerPokemonId, params.opponentPokemonId);
+      currentBattle = battleState;
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Savaş başladı!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nKullanılabilir hareketler:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Savaş başlatılamadı: ${error.message}`
+          }
+        ]
+      };
+    }
   }
 );
 
