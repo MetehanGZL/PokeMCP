@@ -322,7 +322,7 @@ async function getPokemonById(id: number): Promise<PokemonResponse> {
 
 // Register Pokémon tools
 server.tool(
-  "rastgele-pokemon",
+  "random_pokemon",
   "Rastgele bir Pokémon seç",
   {},
   async (_args, _extra) => {
@@ -331,7 +331,7 @@ server.tool(
 );
 
 server.tool(
-  "bolgeden-rastgele-pokemon",
+  "random_pokemon_from_region",
   "Belirli bir bölgeden rastgele bir Pokémon seç",
   {
     region: z
@@ -344,7 +344,7 @@ server.tool(
 );
 
 server.tool(
-  "turden-rastgele-pokemon",
+  "random_pokemon_by_type",
   "Belirli bir türden rastgele bir Pokémon seç",
   {
     type: z
@@ -358,7 +358,7 @@ server.tool(
 
 // Natural language query tool
 server.tool(
-  "pokemon-sorgu",
+  "pokemon_query",
   "Doğal dil ile Pokémon sorguları yap",
   {
     query: z.string().describe("Pokémon hakkında doğal dil sorgusu"),
@@ -549,7 +549,7 @@ async function startBattle(playerPokemonId: number, opponentPokemonId: number): 
 
 // Update battle commands to use tool instead of addCommand
 server.tool(
-  "savas-baslat",
+  "start_battle",
   "İki Pokémon arasında savaş başlat",
   {
     playerPokemonId: z.number().describe("Oyuncunun Pokémon'unun ID'si"),
@@ -571,7 +571,7 @@ server.tool(
 );
 
 server.tool(
-  "hareket-yap",
+  "make_move",
   "Mevcut savaşta bir hareket yap",
   {
     moveIndex: z.number().min(0).max(3).describe("Kullanılacak hareketin indeksi (0-3)")
@@ -582,7 +582,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: "Aktif bir savaş yok! Önce savas-baslat komutu ile bir savaş başlatın."
+            text: "Aktif bir savaş yok! Önce start_battle komutu ile bir savaş başlatın."
           }
         ]
       };
