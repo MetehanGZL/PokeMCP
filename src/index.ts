@@ -322,8 +322,8 @@ async function getPokemonById(id: number): Promise<PokemonResponse> {
 
 // Register Pokémon tools
 server.tool(
-  "random-pokemon",
-  "Get a random Pokémon",
+  "rastgele-pokemon",
+  "Rastgele bir Pokémon seç",
   {},
   async (_args, _extra) => {
     return await getRandomPokemon();
@@ -331,12 +331,12 @@ server.tool(
 );
 
 server.tool(
-  "random-pokemon-from-region",
-  "Get a random Pokémon from a specific region",
+  "bolgeden-rastgele-pokemon",
+  "Belirli bir bölgeden rastgele bir Pokémon seç",
   {
     region: z
       .string()
-      .describe("The Pokémon region (e.g., kanto, johto, hoenn, etc.)"),
+      .describe("Pokémon bölgesi (örn: kanto, johto, hoenn, vb.)"),
   },
   async ({ region }, _extra) => {
     return await getRandomPokemonFromRegion(region);
@@ -344,12 +344,12 @@ server.tool(
 );
 
 server.tool(
-  "random-pokemon-by-type",
-  "Get a random Pokémon of a specific type",
+  "turden-rastgele-pokemon",
+  "Belirli bir türden rastgele bir Pokémon seç",
   {
     type: z
       .string()
-      .describe("The Pokémon type (e.g., fire, water, grass, etc.)"),
+      .describe("Pokémon türü (örn: ateş, su, çimen, vb.)"),
   },
   async ({ type }, _extra) => {
     return await getRandomPokemonByType(type);
@@ -358,10 +358,10 @@ server.tool(
 
 // Natural language query tool
 server.tool(
-  "pokemon-query",
-  "Answer natural language Pokémon queries",
+  "pokemon-sorgu",
+  "Doğal dil ile Pokémon sorguları yap",
   {
-    query: z.string().describe("A natural language query about Pokémon"),
+    query: z.string().describe("Pokémon hakkında doğal dil sorgusu"),
   },
   async ({ query }, _extra) => {
     const normalizedQuery = query.toLowerCase();
@@ -369,7 +369,7 @@ server.tool(
     // Check for Pokémon number query
     const numberMatch =
       normalizedQuery.match(/pokemon\s+#?(\d+)/i) ||
-      normalizedQuery.match(/what\s+is\s+pokemon\s+#?(\d+)/i);
+      normalizedQuery.match(/hangi\s+pokemon\s+#?(\d+)/i);
     if (numberMatch) {
       const pokemonId = parseInt(numberMatch[1], 10);
       return await getPokemonById(pokemonId);
@@ -377,15 +377,15 @@ server.tool(
 
     // Check for random Pokémon request
     if (
-      normalizedQuery.includes("random pokemon") &&
-      !normalizedQuery.includes("from") &&
-      !normalizedQuery.includes("type")
+      normalizedQuery.includes("rastgele pokemon") &&
+      !normalizedQuery.includes("bölgeden") &&
+      !normalizedQuery.includes("türünden")
     ) {
       return await getRandomPokemon();
     }
 
     // Check for random Pokémon from region
-    const regionMatch = normalizedQuery.match(/random pokemon from (\w+)/i);
+    const regionMatch = normalizedQuery.match(/rastgele pokemon bölgeden (\w+)/i);
     if (regionMatch) {
       const region = regionMatch[1].toLowerCase();
       return await getRandomPokemonFromRegion(region);
@@ -393,30 +393,30 @@ server.tool(
 
     // Check for random Pokémon by type
     const typeMatch =
-      normalizedQuery.match(/random (\w+) pokemon/i) ||
-      normalizedQuery.match(/random pokemon of type (\w+)/i);
+      normalizedQuery.match(/rastgele (\w+) pokemon/i) ||
+      normalizedQuery.match(/rastgele (\w+) türünden pokemon/i);
     if (typeMatch) {
       const type = typeMatch[1].toLowerCase();
       // Check if the matched word is actually a type and not just any adjective
       const validTypes = [
         "normal",
-        "fire",
-        "water",
-        "grass",
-        "electric",
-        "ice",
-        "fighting",
-        "poison",
-        "ground",
-        "flying",
-        "psychic",
-        "bug",
-        "rock",
-        "ghost",
-        "dragon",
-        "dark",
-        "steel",
-        "fairy",
+        "ateş",
+        "su",
+        "çimen",
+        "elektrik",
+        "buz",
+        "dövüş",
+        "zehir",
+        "yer",
+        "uçan",
+        "psişik",
+        "böcek",
+        "kaya",
+        "hayalet",
+        "ejderha",
+        "karanlık",
+        "çelik",
+        "peri",
       ];
       if (validTypes.includes(type)) {
         return await getRandomPokemonByType(type);
@@ -429,11 +429,11 @@ server.tool(
         {
           type: "text",
           text: `
-I can help with Pokémon queries! Try asking:
-- "What is pokemon #25?"
-- "Give me a random Pokémon"
-- "Give me a random Pokémon from Kanto"
-- "Give me a random Fire Pokémon"
+Pokémon sorguları için yardımcı olabilirim! Şunları deneyebilirsiniz:
+- "25 numaralı pokemon nedir?"
+- "Bana rastgele bir Pokémon ver"
+- "Bana Kanto bölgesinden rastgele bir Pokémon ver"
+- "Bana Ateş türünden rastgele bir Pokémon ver"
           `.trim(),
         },
       ],
@@ -549,11 +549,11 @@ async function startBattle(playerPokemonId: number, opponentPokemonId: number): 
 
 // Update battle commands to use tool instead of addCommand
 server.tool(
-  "start_battle",
-  "Start a battle between two Pokémon",
+  "savas-baslat",
+  "İki Pokémon arasında savaş başlat",
   {
-    playerPokemonId: z.number().describe("ID of the player's Pokémon"),
-    opponentPokemonId: z.number().describe("ID of the opponent's Pokémon")
+    playerPokemonId: z.number().describe("Oyuncunun Pokémon'unun ID'si"),
+    opponentPokemonId: z.number().describe("Rakibin Pokémon'unun ID'si")
   },
   async (params) => {
     const battleState = await startBattle(params.playerPokemonId, params.opponentPokemonId);
@@ -563,7 +563,7 @@ server.tool(
       content: [
         {
           type: "text",
-          text: `Battle started!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} HP: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} HP: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nAvailable moves:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
+          text: `Savaş başladı!\n${battleState.playerPokemon.name} vs ${battleState.opponentPokemon.name}\n\n${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n\nKullanılabilir hareketler:\n${battleState.playerPokemon.moves.map((move, index) => `${index}: ${move.name}`).join('\n')}`
         }
       ]
     };
@@ -571,10 +571,10 @@ server.tool(
 );
 
 server.tool(
-  "make_move",
-  "Make a move in the current battle",
+  "hareket-yap",
+  "Mevcut savaşta bir hareket yap",
   {
-    moveIndex: z.number().min(0).max(3).describe("Index of the move to use (0-3)")
+    moveIndex: z.number().min(0).max(3).describe("Kullanılacak hareketin indeksi (0-3)")
   },
   async (params) => {
     if (!currentBattle) {
@@ -582,7 +582,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: "No active battle! Start a battle first using start_battle command."
+            text: "Aktif bir savaş yok! Önce savas-baslat komutu ile bir savaş başlatın."
           }
         ]
       };
@@ -594,17 +594,17 @@ server.tool(
     const playerMove = battleState.playerPokemon.moves[params.moveIndex];
     const opponentMove = battleState.opponentPokemon.moves[Math.floor(Math.random() * battleState.opponentPokemon.moves.length)];
 
-    let battleLog = `Turn ${battleState.turn}:\n`;
-    battleLog += `${battleState.playerPokemon.name} used ${playerMove.name}!\n`;
-    battleLog += `${battleState.opponentPokemon.name} used ${opponentMove.name}!\n\n`;
+    let battleLog = `Tur ${battleState.turn}:\n`;
+    battleLog += `${battleState.playerPokemon.name} ${playerMove.name} hareketini kullandı!\n`;
+    battleLog += `${battleState.opponentPokemon.name} ${opponentMove.name} hareketini kullandı!\n\n`;
 
-    battleLog += `${battleState.playerPokemon.name} HP: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n`;
-    battleLog += `${battleState.opponentPokemon.name} HP: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n`;
+    battleLog += `${battleState.playerPokemon.name} Can: ${battleState.playerPokemon.currentHp}/${battleState.playerPokemon.stats.hp}\n`;
+    battleLog += `${battleState.opponentPokemon.name} Can: ${battleState.opponentPokemon.currentHp}/${battleState.opponentPokemon.stats.hp}\n`;
 
     // Check for battle end
     if (battleState.playerPokemon.currentHp <= 0 || battleState.opponentPokemon.currentHp <= 0) {
       const winner = battleState.playerPokemon.currentHp <= 0 ? battleState.opponentPokemon.name : battleState.playerPokemon.name;
-      battleLog += `\nBattle ended! ${winner} wins!`;
+      battleLog += `\nSavaş bitti! ${winner} kazandı!`;
       currentBattle = null;
     }
 
